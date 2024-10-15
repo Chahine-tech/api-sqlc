@@ -1,0 +1,42 @@
+version: "3"
+
+services:
+  database:
+    container_name: node-lite-postgres
+    hostname: node-lite-postgres
+    image: postgres:14.2
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: database
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: go_api
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: database
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
