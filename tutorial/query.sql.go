@@ -9,6 +9,22 @@ import (
 	"context"
 )
 
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email
+`
+
+type CreateUserParams struct {
+	Name  string
+	Email string
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Email)
+	var i User
+	err := row.Scan(&i.ID, &i.Name, &i.Email)
+	return i, err
+}
+
 const getUsers = `-- name: GetUsers :many
 SELECT id, name, email FROM users
 `
