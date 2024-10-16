@@ -3,24 +3,31 @@
 //   sqlc v1.27.0
 // source: query.sql
 
-package tutorial
+package repository
 
 import (
 	"context"
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email
+INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email
 `
 
 type CreateUserParams struct {
+	Name     string
+	Email    string
+	Password string
+}
+
+type CreateUserRow struct {
+	ID    int32
 	Name  string
 	Email string
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Email)
-	var i User
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Email, arg.Password)
+	var i CreateUserRow
 	err := row.Scan(&i.ID, &i.Name, &i.Email)
 	return i, err
 }
@@ -39,15 +46,21 @@ const getUsers = `-- name: GetUsers :many
 SELECT id, name, email FROM users
 `
 
-func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
+type GetUsersRow struct {
+	ID    int32
+	Name  string
+	Email string
+}
+
+func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 	rows, err := q.db.Query(ctx, getUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []GetUsersRow
 	for rows.Next() {
-		var i User
+		var i GetUsersRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.Email); err != nil {
 			return nil, err
 		}
@@ -61,20 +74,32 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET name = $2, email = $3
+SET name = $2, email = $3, password = $4
 WHERE id = $1
 RETURNING id, name, email
 `
 
 type UpdateUserParams struct {
+	ID       int32
+	Name     string
+	Email    string
+	Password string
+}
+
+type UpdateUserRow struct {
 	ID    int32
 	Name  string
 	Email string
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.ID, arg.Name, arg.Email)
-	var i User
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.ID,
+		arg.Name,
+		arg.Email,
+		arg.Password,
+	)
+	var i UpdateUserRow
 	err := row.Scan(&i.ID, &i.Name, &i.Email)
 	return i, err
 }

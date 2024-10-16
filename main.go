@@ -8,17 +8,24 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Chahine-tech/api-sqlc/tutorial"
+	"github.com/Chahine-tech/api-sqlc/repository"
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Server struct {
-	store *tutorial.Queries
+	store *repository.Queries
 }
 
-func NewServer(store *tutorial.Queries) *Server {
+func NewServer(store *repository.Queries) *Server {
 	return &Server{store: store}
+}
+
+// Helper function to hash password
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
 }
 
 func (s *Server) getUsersHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,24 +35,32 @@ func (s *Server) getUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if users == nil {
-		users = []tutorial.User{}
+		users = []repository.GetUsersRow{}
 	}
 	json.NewEncoder(w).Encode(users)
 }
 
 func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 
-	params := tutorial.CreateUserParams{
-		Name:  input.Name,
-		Email: input.Email,
+	hashedPassword, err := hashPassword(input.Password)
+	if err != nil {
+		http.Error(w, "Unable to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	params := repository.CreateUserParams{
+		Name:     input.Name,
+		Email:    input.Email,
+		Password: hashedPassword,
 	}
 
 	user, err := s.store.CreateUser(context.Background(), params)
@@ -70,18 +85,26 @@ func (s *Server) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 
-	params := tutorial.UpdateUserParams{
-		ID:    int32(id),
-		Name:  input.Name,
-		Email: input.Email,
+	hashedPassword, err := hashPassword(input.Password)
+	if err != nil {
+		http.Error(w, "Unable to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	params := repository.UpdateUserParams{
+		ID:       int32(id),
+		Name:     input.Name,
+		Email:    input.Email,
+		Password: hashedPassword,
 	}
 
 	user, err := s.store.UpdateUser(context.Background(), params)
@@ -123,7 +146,7 @@ func main() {
 	}
 	defer conn.Close(context.Background())
 
-	store := tutorial.New(conn)
+	store := repository.New(conn)
 	server := NewServer(store)
 
 	http.HandleFunc("/users", server.getUsersHandler)

@@ -2,10 +2,11 @@
 // versions:
 //   sqlc v1.27.0
 
-package tutorial
+package repository
 
 type User struct {
-	ID    int32
-	Name  string
-	Email string
+	ID       int32
+	Name     string
+	Email    string
+	Password string
 }
